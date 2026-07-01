@@ -15,7 +15,7 @@ import {
   ListItemText,
   TextField,
 } from '@mui/material';
-import { Trash2, Plus, Filter, RotateCcw, HelpCircle, PlusCircle } from 'lucide-react';
+import { Trash2, Plus, Filter, RotateCcw, HelpCircle, PlusCircle, CheckCircle2 } from 'lucide-react';
 import type {
   FilterFieldConfig,
   FilterRule,
@@ -30,6 +30,7 @@ interface FilterBuilderProps {
   configs: FilterFieldConfig[];
   rules: FilterRule[];
   onChange: (rules: FilterRule[]) => void;
+  onApply?: (rules: FilterRule[]) => void;
 }
 
 // ─── Debounced text input ────────────────────────────────────────────────────
@@ -202,7 +203,24 @@ const ValueInput: React.FC<{
 
 // ─── Main FilterBuilder ──────────────────────────────────────────────────────
 
-export const FilterBuilder: React.FC<FilterBuilderProps> = ({ configs, rules, onChange }) => {
+export const FilterBuilder: React.FC<FilterBuilderProps> = ({ configs, rules, onChange, onApply }) => {
+  // Draft state — changes stay local until the user clicks Apply
+  const [draft, setDraft] = React.useState<FilterRule[]>(rules);
+
+  // Keep draft in sync if parent resets rules externally (e.g. Clear All from outside)
+  React.useEffect(() => { setDraft(rules); }, [rules]);
+
+  const hasPendingChanges = JSON.stringify(draft) !== JSON.stringify(rules);
+
+  const handleApply = () => {
+    onChange(draft);
+    onApply?.(draft);
+  };
+
+  const handleClearAll = () => {
+    setDraft([]);
+    onChange([]);
+  };
 
   const genId = () => Math.random().toString(36).substring(2, 9);
 
@@ -213,69 +231,71 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({ configs, rules, on
     return '';
   };
 
-  // Derive a stable ordered list of unique fields currently in the rules
+  // All mutations now operate on `draft` via setDraft
+  const draftRules = draft;
+
+  // Derive a stable ordered list of unique fields currently in the draft
   const fieldOrder = React.useMemo(() => {
     const seen = new Set<string>();
     const order: string[] = [];
-    rules.forEach(r => { if (!seen.has(r.field)) { seen.add(r.field); order.push(r.field); } });
+    draftRules.forEach(r => { if (!seen.has(r.field)) { seen.add(r.field); order.push(r.field); } });
     return order;
-  }, [rules]);
+  }, [draftRules]);
 
   // Group rules by field
   const rulesByField = React.useMemo(() => {
     const map: Record<string, FilterRule[]> = {};
-    rules.forEach(r => {
+    draftRules.forEach(r => {
       if (!map[r.field]) map[r.field] = [];
       map[r.field].push(r);
     });
     return map;
-  }, [rules]);
+  }, [draftRules]);
 
   // Add a brand-new column group (first filter for that field)
   const handleAddColumnGroup = () => {
-    // Pick the first config not already in use, or fall back to configs[0]
     const unusedConfig = configs.find(c => !rulesByField[c.id]) ?? configs[0];
     if (!unusedConfig) return;
     const op = TYPE_OPERATORS[unusedConfig.type][0];
     const newRule: FilterRule = { id: genId(), field: unusedConfig.id, operator: op, value: defaultValue(op) };
-    onChange([...rules, newRule]);
+    setDraft(prev => [...prev, newRule]);
   };
 
   // Add an OR condition to an existing field group
   const handleAddOrCondition = (fieldId: string) => {
     const config = configs.find(c => c.id === fieldId)!;
     const existingRule = (rulesByField[fieldId] ?? [])[0];
-    // Keep the same operator as the first rule in that group
     const op: Operator = existingRule?.operator ?? TYPE_OPERATORS[config.type][0];
     const newRule: FilterRule = { id: genId(), field: fieldId, operator: op, value: defaultValue(op) };
-    // Insert the new OR rule right after the last rule for this field
-    const insertAfterIdx = rules.reduce((last, r, i) => r.field === fieldId ? i : last, -1);
-    const next = [...rules];
-    next.splice(insertAfterIdx + 1, 0, newRule);
-    onChange(next);
+    setDraft(prev => {
+      const insertAfterIdx = prev.reduce((last, r, i) => r.field === fieldId ? i : last, -1);
+      const next = [...prev];
+      next.splice(insertAfterIdx + 1, 0, newRule);
+      return next;
+    });
   };
 
-  // Remove a single rule
-  const handleRemoveRule = (id: string) => onChange(rules.filter(r => r.id !== id));
+  // Remove a single rule from draft
+  const handleRemoveRule = (id: string) => setDraft(prev => prev.filter(r => r.id !== id));
 
-  // Remove all rules for a field group
-  const handleRemoveGroup = (fieldId: string) => onChange(rules.filter(r => r.field !== fieldId));
+  // Remove all rules for a field group from draft
+  const handleRemoveGroup = (fieldId: string) => setDraft(prev => prev.filter(r => r.field !== fieldId));
 
   // Update a rule's field — resets operator + value
   const handleFieldChange = (id: string, newFieldId: string) => {
     const config = configs.find(c => c.id === newFieldId)!;
     const op = TYPE_OPERATORS[config.type][0];
-    onChange(rules.map(r => r.id === id ? { ...r, field: newFieldId, operator: op, value: defaultValue(op) } : r));
+    setDraft(prev => prev.map(r => r.id === id ? { ...r, field: newFieldId, operator: op, value: defaultValue(op) } : r));
   };
 
   // Update a rule's operator — resets value
   const handleOperatorChange = (id: string, op: Operator) => {
-    onChange(rules.map(r => r.id === id ? { ...r, operator: op, value: defaultValue(op) } : r));
+    setDraft(prev => prev.map(r => r.id === id ? { ...r, operator: op, value: defaultValue(op) } : r));
   };
 
   // Update a rule's value / any partial fields
   const handleRuleUpdate = (id: string, partial: Partial<FilterRule>) => {
-    onChange(rules.map(r => r.id === id ? { ...r, ...partial } : r));
+    setDraft(prev => prev.map(r => r.id === id ? { ...r, ...partial } : r));
   };
 
   return (
@@ -297,29 +317,59 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({ configs, rules, on
           <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
             Filter Directory
           </Typography>
-          {rules.length > 0 && (
+          {draftRules.length > 0 && (
             <Chip
               size="small"
-              label={`${rules.length} condition${rules.length > 1 ? 's' : ''}`}
+              label={`${draftRules.length} condition${draftRules.length > 1 ? 's' : ''}`}
               sx={{ bgcolor: 'rgba(99,102,241,0.08)', color: 'primary.main', fontWeight: 600 }}
+            />
+          )}
+          {hasPendingChanges && (
+            <Chip
+              size="small"
+              label="Unsaved changes"
+              sx={{ bgcolor: 'rgba(234,179,8,0.1)', color: '#b45309', fontWeight: 600, fontSize: '0.72rem' }}
             />
           )}
         </Box>
 
-        {rules.length > 0 && (
-          <Button
-            size="small" color="error" variant="outlined"
-            startIcon={<RotateCcw size={14} />}
-            onClick={() => onChange([])}
-            sx={{ borderRadius: 1.5, textTransform: 'none' }}
-          >
-            Clear All
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {draftRules.length > 0 && (
+            <Button
+              size="small" color="error" variant="outlined"
+              startIcon={<RotateCcw size={14} />}
+              onClick={handleClearAll}
+              sx={{ borderRadius: 1.5, textTransform: 'none' }}
+            >
+              Clear All
+            </Button>
+          )}
+          {/* {draftRules.length > 0 && (
+            <Button
+              size="small"
+              variant="contained"
+              color={hasPendingChanges ? 'warning' : 'primary'}
+              startIcon={<CheckCircle2 size={14} />}
+              onClick={handleApply}
+              sx={{
+                borderRadius: 1.5,
+                textTransform: 'none',
+                boxShadow: 'none',
+                fontWeight: 600,
+                ...(hasPendingChanges && {
+                  bgcolor: '#d97706',
+                  '&:hover': { bgcolor: '#b45309' },
+                }),
+              }}
+            >
+              Apply Filters
+            </Button>
+          )} */}
+        </Box>
       </Box>
 
       {/* ── Empty state ── */}
-      {rules.length === 0 ? (
+      {draftRules.length === 0 ? (
         <Box sx={{ py: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
           <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
             <HelpCircle size={16} />
@@ -496,21 +546,46 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({ configs, rules, on
         </Box>
       )}
 
-      {/* ── Add column filter button ── */}
-      <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<Plus size={14} />}
-          onClick={handleAddColumnGroup}
-          sx={{ borderRadius: 2, textTransform: 'none', boxShadow: 'none' }}
-        >
-          Add Column Filter
-        </Button>
-        {rules.length > 0 && (
-          <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
-            Different columns are joined with <strong>AND</strong> · Same column uses <strong>OR</strong>
-          </Typography>
+      {/* ── Footer: Add column filter + Apply ── */}
+      <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Plus size={14} />}
+            onClick={handleAddColumnGroup}
+            sx={{ borderRadius: 2, textTransform: 'none', boxShadow: 'none' }}
+          >
+            Add Column Filter
+          </Button>
+          {draftRules.length > 0 && (
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Different columns are joined with <strong>AND</strong> · Same column uses <strong>OR</strong>
+            </Typography>
+          )}
+        </Box>
+
+        {draftRules.length > 0 && (
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<CheckCircle2 size={14} />}
+            onClick={handleApply}
+            color={hasPendingChanges ? 'warning' : 'primary'}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              boxShadow: 'none',
+              fontWeight: 600,
+              minWidth: 140,
+              ...(hasPendingChanges && {
+                bgcolor: '#d97706',
+                '&:hover': { bgcolor: '#b45309' },
+              }),
+            }}
+          >
+            {hasPendingChanges ? 'Apply Filters ✦' : 'Apply Filters'}
+          </Button>
         )}
       </Box>
     </Paper>
