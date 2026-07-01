@@ -1,7 +1,7 @@
 import React from 'react';
 import { Container, Box, CircularProgress, Alert } from '@mui/material';
 import { Filter } from 'lucide-react';
-import { PageHeader } from './PageHeader';
+import { PageHeader, PageBreadcrumbs } from './PageHeader';
 import type { Employee } from '../types/employee';
 import type { FilterFieldConfig, FilterRule } from '../types/filter';
 import { DashboardStats } from '../components/DashboardStats';
@@ -93,7 +93,8 @@ export const Home: React.FC = () => {
         icon={<Filter size={24} color="#ffffff" />}
         title="Employee Directory"
       />
-      <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+      <Container maxWidth={false} sx={{ pt: 2, pb: 6, px: { xs: 2, sm: 3, md: 4 } }}>
+        <PageBreadcrumbs />
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
@@ -117,7 +118,7 @@ export const Home: React.FC = () => {
               rules={rules}
               onChange={setRules}
             />
-            <DataTable data={filteredEmployees} totalRecordsCount={employees.length} />
+            <DataTable data={filteredEmployees} />
           </>
         )}
       </Container>

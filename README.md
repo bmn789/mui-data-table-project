@@ -8,7 +8,10 @@ A fully type-safe, configuration-driven React 18, TypeScript, and Material UI v9
 *   **Logical AND & OR Operations**: Combines rules using OR conditions when filtering on the same field, and AND conditions when filtering across different fields.
 *   **MUI v9 & Google Typography**: Clean, responsive layout with Outfit & Inter typefaces, modern border styling, and micro-hover transitions.
 *   **Real-Time Debounced Searching**: Inputs are debounced by 300ms to ensure filtering remains performant and doesn't cause typing lags.
-*   **Export Functions**: Download filtered segments instantly to either `.csv` or `.json` formats.
+*   **Dynamic Column Control**: Select and toggle the visibility of individual data columns dynamically through an interactive dropdown modal, instantly adjusting the table layout.
+*   **Column-Aware Data Exporting**: Download filtered datasets instantly to either `.csv` or `.json` formats. The export system automatically respects and dynamically filters the dataset based on active column visibility selections configured by the user.
+*   **Adaptive Dual-Theme Mode (Light & Dark)**: Features a beautiful, custom-designed dark and light mode theme leveraging Material UI palette overrides. Includes easy-to-use toggle controls placed in the sidebar footer and individual page headers.
+*   **Persistent Preferences**: Automatically saves and loads the user's preferred theme mode (Light or Dark) in `localStorage`, maintaining their preferred style across page refreshes and reloads. Defaults cleanly to Light Mode on first-time visits.
 *   **Directory Metrics**: Insight cards summarizing total results, matching percentages, average salaries, and project counts of matches.
 *   **Interactive Sorting & Pagination**: Sort nested location keys or direct properties dynamically (both ascending and descending) with paging limits.
 
@@ -94,6 +97,24 @@ const filterFieldConfigs: FilterFieldConfig[] = [
 | **Select** | Is, Is Not | Option dropdown |
 | **Multi-Select** / **Array** | In, Not In, Contains Any, Contains All, Does Not Contain | Multiple checkbox select dropdown with chips |
 | **Boolean** | Is | True (Active) / False (Inactive) select dropdown |
+
+---
+
+## 🎨 Theme Customization & Persistence
+
+The application includes a dual-theme system built directly with Material UI v9 `ThemeProvider`.
+*   **Default State**: The application defaults to the **Light Theme** for first-time visitors.
+*   **Toggle Controls**: Users can switch themes via the theme toggle button (Sun/Moon icon) available in two convenient locations:
+    1.  **Sidebar Footer**: Located at the bottom left of the application sidebar, next to the user profile badge.
+    2.  **Page Header**: Located on the top-right side of individual page headers.
+*   **Local Storage Sync**: Every theme toggle updates the `theme-mode` key in `localStorage`. Upon reloading, the system retrieves and applies the stored theme automatically to prevent theme flashing.
+
+---
+
+## 📊 Column Visibility & Export
+
+*   **Column Customization**: Users can toggle which columns are visible inside the data table using the **Columns** visibility control modal.
+*   **Filtered Column Export**: Clicking on the **Export** button (available in both CSV and JSON formats) will generate an export containing *only* the columns currently visible in the table. This keeps exports relevant and aligned with the user's current view.
 
 ---
 

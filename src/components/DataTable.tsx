@@ -15,6 +15,7 @@ import {
   Button,
   Rating,
   Tooltip,
+  Checkbox,
 } from '@mui/material';
 import { FileDown, Download, AlertCircle, Eye } from 'lucide-react';
 import type { Employee } from '../types/employee';
@@ -23,13 +24,13 @@ import { ColumnVisibilityModal, type ColumnConfig } from './ColumnVisibilityModa
 
 interface DataTableProps {
   data: Employee[];
-  totalRecordsCount: number;
 }
 
 type SortKey = keyof Employee | 'address.city' | 'address.country';
 
 // List of columns configurable for visibility
 const TABLE_COLUMNS: ColumnConfig[] = [
+  { key: 'id', label: 'ID' },
   { key: 'name', label: 'Name' },
   { key: 'department', label: 'Department' },
   { key: 'role', label: 'Role' },
@@ -41,7 +42,7 @@ const TABLE_COLUMNS: ColumnConfig[] = [
   { key: 'performanceRating', label: 'Rating' },
 ];
 
-export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount }) => {
+export const DataTable: React.FC<DataTableProps> = ({ data }) => {
   const [sortKey, setSortKey] = React.useState<SortKey>('name');
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('asc');
   const [page, setPage] = React.useState(0);
@@ -49,6 +50,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
 
   // Column Visibility State
   const [visibleColumns, setVisibleColumns] = React.useState<Record<string, boolean>>({
+    id: true,
     name: true,
     department: true,
     role: true,
@@ -61,9 +63,13 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
   });
   const [modalOpen, setModalOpen] = React.useState(false);
 
-  // Reset page to 0 if data changes (e.g. filters change)
+  // Row Selection State
+  const [selectedIds, setSelectedIds] = React.useState<Set<number>>(new Set());
+
+  // Reset page to 0 and clear selection if data changes (e.g. filters change)
   React.useEffect(() => {
     setPage(0);
+    setSelectedIds(new Set());
   }, [data]);
 
   const handleSort = (key: SortKey) => {
@@ -145,6 +151,9 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
 
     const rows = data.map(emp => {
       return colKeys.map(key => {
+        if (key === 'id') {
+          return `"#${emp.id}"`;
+        }
         if (key === 'address') {
           return `"${emp.address.city}, ${emp.address.state}, ${emp.address.country}"`;
         }
@@ -179,10 +188,14 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
     if (data.length === 0) return;
 
     const exportedData = data.map(emp => {
-      const entry: Record<string, any> = { id: emp.id };
+      const entry: Record<string, any> = {};
       TABLE_COLUMNS.forEach(col => {
         if (visibleColumns[col.key]) {
-          entry[col.key] = (emp as any)[col.key];
+          if (col.key === 'id') {
+            entry[col.key] = `#${emp.id}`;
+          } else {
+            entry[col.key] = (emp as any)[col.key];
+          }
         }
       });
       return entry;
@@ -211,6 +224,31 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
 
   const visibleColumnsCount = Object.values(visibleColumns).filter(Boolean).length;
 
+  // Selection helpers
+  const allPageIds = paginatedData.map(e => e.id);
+  const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selectedIds.has(id));
+  const somePageSelected = allPageIds.some(id => selectedIds.has(id)) && !allPageSelected;
+
+  const handleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        allPageIds.forEach(id => next.delete(id));
+      } else {
+        allPageIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleSelectRow = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <Paper
       elevation={0}
@@ -235,16 +273,27 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
           borderColor: 'divider',
         }}
       >
-        <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1rem', color: 'text.primary' }}>
             Employees Database
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Showing {data.length} of {totalRecordsCount} entries
-          </Typography>
+          <Chip
+            size="small"
+            label={`${data.length} record${data.length !== 1 ? 's' : ''}`}
+            sx={{ bgcolor: 'rgba(99,102,241,0.08)', color: 'primary.main', fontWeight: 600 }}
+          />
+          {selectedIds.size > 0 && (
+            <Chip
+              size="small"
+              label={`${selectedIds.size} selected`}
+              color="primary"
+              onDelete={() => setSelectedIds(new Set())}
+              sx={{ fontWeight: 600, height: 24, fontSize: '0.75rem' }}
+            />
+          )}
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             size="small"
             variant="outlined"
@@ -300,6 +349,27 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
         <Table stickyHeader size="medium">
           <TableHead>
             <TableRow>
+              {/* Select-all checkbox */}
+              <TableCell padding="checkbox" sx={{ bgcolor: 'background.paper' }}>
+                <Checkbox
+                  size="small"
+                  checked={allPageSelected}
+                  indeterminate={somePageSelected}
+                  onChange={handleSelectAll}
+                  slotProps={{ input: { 'aria-label': 'select all rows on page' } }}
+                />
+              </TableCell>
+              {visibleColumns.id && (
+                <TableCell sx={{ fontWeight: 650, bgcolor: 'background.paper', whiteSpace: 'nowrap' }}>
+                  <TableSortLabel
+                    active={sortKey === 'id'}
+                    direction={sortKey === 'id' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('id')}
+                  >
+                    ID
+                  </TableSortLabel>
+                </TableCell>
+              )}
               {visibleColumns.name && (
                 <TableCell sx={{ fontWeight: 650, bgcolor: 'background.paper', whiteSpace: 'nowrap' }}>
                   <TableSortLabel
@@ -397,11 +467,29 @@ export const DataTable: React.FC<DataTableProps> = ({ data, totalRecordsCount })
                 <TableRow
                   key={emp.id}
                   hover
+                  selected={selectedIds.has(emp.id)}
                   sx={{
                     '&:last-child td, &:last-child th': { border: 0 },
                     transition: 'background-color 0.2s ease',
+                    cursor: 'pointer',
                   }}
+                  onClick={() => handleSelectRow(emp.id)}
                 >
+                  <TableCell padding="checkbox" onClick={e => e.stopPropagation()}>
+                    <Checkbox
+                      size="small"
+                      checked={selectedIds.has(emp.id)}
+                      onChange={() => handleSelectRow(emp.id)}
+                      slotProps={{ input: { 'aria-label': `select row ${emp.id}` } }}
+                    />
+                  </TableCell>
+                  {visibleColumns.id && (
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                        #{emp.id}
+                      </Typography>
+                    </TableCell>
+                  )}
                   {visibleColumns.name && (
                     <TableCell>
                       <Box>

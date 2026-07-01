@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
   IconButton,
   MenuItem,
@@ -81,8 +82,11 @@ export function GenericDataTable<T extends Record<string, unknown>>({
   );
   const [colModalOpen, setColModalOpen] = React.useState(false);
 
+  // Row Selection State
+  const [selectedIds, setSelectedIds] = React.useState<Set<string | number>>(new Set());
+
   // Reset to page 1 when data changes (after filter)
-  React.useEffect(() => setPage(1), [data]);
+  React.useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [data]);
 
   // Sorted data
   const sorted = React.useMemo(() => {
@@ -106,6 +110,31 @@ export function GenericDataTable<T extends Record<string, unknown>>({
   const visibleColumns = columns.filter(c => visibleCols[c.key]);
   const visibleColumnsCount = visibleColumns.length;
 
+  // Page-level selection helpers (computed after paginated)
+  const pageKeys = paginated.map(row => (row.id ?? '') as string | number);
+  const allPageSelected = pageKeys.length > 0 && pageKeys.every(k => selectedIds.has(k));
+  const somePageSelected = pageKeys.some(k => selectedIds.has(k)) && !allPageSelected;
+
+  const handleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageKeys.forEach(k => next.delete(k));
+      } else {
+        pageKeys.forEach(k => next.add(k));
+      }
+      return next;
+    });
+  };
+
+  const handleSelectRow = (key: string | number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -121,7 +150,10 @@ export function GenericDataTable<T extends Record<string, unknown>>({
     const rows = sorted.map(row =>
       visibleColumns.map(c => {
         const v = row[c.key];
-        const str = v === null || v === undefined ? '' : String(v);
+        let str = v === null || v === undefined ? '' : String(v);
+        if (c.key === 'id') {
+          str = `#${str}`;
+        }
         return str.includes(',') ? `"${str}"` : str;
       }).join(',')
     );
@@ -136,7 +168,13 @@ export function GenericDataTable<T extends Record<string, unknown>>({
 
   const exportToJSON = () => {
     const filtered = sorted.map(row =>
-      Object.fromEntries(visibleColumns.map(c => [c.key, row[c.key]]))
+      Object.fromEntries(visibleColumns.map(c => {
+        let val = row[c.key];
+        if (c.key === 'id') {
+          val = `#${val}`;
+        }
+        return [c.key, val];
+      }))
     );
     const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -190,9 +228,18 @@ export function GenericDataTable<T extends Record<string, unknown>>({
               variant="outlined"
             />
           )}
+          {selectedIds.size > 0 && (
+            <Chip
+              size="small"
+              label={`${selectedIds.size} selected`}
+              color="primary"
+              onDelete={() => setSelectedIds(new Set())}
+              sx={{ fontWeight: 600 }}
+            />
+          )}
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           {/* Column visibility */}
           <Tooltip title={`${visibleColumnsCount} of ${columns.length} columns visible`} arrow placement="top">
             <Button
@@ -237,10 +284,26 @@ export function GenericDataTable<T extends Record<string, unknown>>({
       </Box>
 
       {/* ── Table ── */}
-      <TableContainer sx={{ overflowX: 'auto' }}>
-        <Table size="small">
+      <TableContainer sx={{ overflowX: 'auto', maxHeight: 400 }}>
+        <Table stickyHeader size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: '#f8fafc' }}>
+            <TableRow>
+              {/* Select-all checkbox */}
+              <TableCell
+                padding="checkbox"
+                sx={{
+                  bgcolor: 'background.paper',
+                  py: 1.5
+                }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={allPageSelected}
+                  indeterminate={somePageSelected}
+                  onChange={handleSelectAll}
+                  slotProps={{ input: { 'aria-label': 'select all rows on page' } }}
+                />
+              </TableCell>
               {visibleColumns.map(col => (
                 <TableCell
                   key={col.key}
@@ -252,9 +315,8 @@ export function GenericDataTable<T extends Record<string, unknown>>({
                     letterSpacing: '0.04em',
                     whiteSpace: 'nowrap',
                     minWidth: col.minWidth ?? 120,
-                    borderBottom: '2px solid',
-                    borderColor: 'divider',
-                    py: 1.5,
+                    bgcolor: 'background.paper',
+                    py: 1.5
                   }}
                 >
                   {col.sortable !== false ? (
@@ -281,25 +343,39 @@ export function GenericDataTable<T extends Record<string, unknown>>({
                 </TableCell>
               </TableRow>
             ) : (
-              paginated.map((row, i) => (
-                <TableRow
-                  key={String(row.id ?? i)}
-                  hover
-                  sx={{
-                    '&:last-child td': { borderBottom: 0 },
-                    transition: 'background-color 0.15s',
-                  }}
-                >
-                  {visibleColumns.map(col => (
-                    <TableCell
-                      key={col.key}
-                      sx={{ whiteSpace: 'nowrap', fontSize: '0.875rem', py: 1.25 }}
-                    >
-                      {col.render ? col.render(row) : String(row[col.key] ?? '—')}
+              paginated.map((row, i) => {
+                const rowKey = (row.id ?? i) as string | number;
+                return (
+                  <TableRow
+                    key={String(row.id ?? i)}
+                    hover
+                    selected={selectedIds.has(rowKey)}
+                    sx={{
+                      '&:last-child td': { borderBottom: 0 },
+                      transition: 'background-color 0.15s',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => handleSelectRow(rowKey)}
+                  >
+                    <TableCell padding="checkbox" onClick={e => e.stopPropagation()}>
+                      <Checkbox
+                        size="small"
+                        checked={selectedIds.has(rowKey)}
+                        onChange={() => handleSelectRow(rowKey)}
+                        slotProps={{ input: { 'aria-label': `select row ${rowKey}` } }}
+                      />
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                    {visibleColumns.map(col => (
+                      <TableCell
+                        key={col.key}
+                        sx={{ whiteSpace: 'nowrap', fontSize: '0.875rem', py: 1.25 }}
+                      >
+                        {col.render ? col.render(row) : String(row[col.key] ?? '—')}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

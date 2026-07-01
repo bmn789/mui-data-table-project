@@ -88,7 +88,7 @@ const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
 const App = () => {
   const [mode, setMode] = React.useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme-mode');
-    return saved === 'light' || saved === 'dark' ? saved : 'light';
+    return saved === 'light' || saved === 'dark' ? saved : 'dark';
   });
 
   React.useEffect(() => {

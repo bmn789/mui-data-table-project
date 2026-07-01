@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Container, CircularProgress, Alert } from '@mui/material';
 import { Users as UsersIcon } from 'lucide-react';
-import { PageHeader } from './PageHeader';
+import { PageHeader, PageBreadcrumbs } from './PageHeader';
 import type { User } from '../types/user';
 import type { FilterFieldConfig, FilterRule } from '../types/filter';
 import { FilterBuilder } from '../components/FilterBuilder';
@@ -25,7 +25,12 @@ const userFilterConfigs: FilterFieldConfig[] = [
 ];
 
 const userColumns: ColumnDef<Record<string, unknown>>[] = [
-  { key: 'id', label: 'ID', minWidth: 70 },
+  {
+    key: 'id',
+    label: 'ID',
+    minWidth: 70,
+    render: (row) => `#${row.id}`,
+  },
   { key: 'name', label: 'Name', minWidth: 160 },
   { key: 'email', label: 'Email', minWidth: 210 },
   { key: 'role', label: 'Role', minWidth: 100 },
@@ -83,7 +88,8 @@ export const UsersPage: React.FC = () => {
         title="Users"
         iconColor="#10b981"
       />
-      <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+      <Container maxWidth={false} sx={{ pt: 2, pb: 6, px: { xs: 2, sm: 3, md: 4 } }}>
+        <PageBreadcrumbs />
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>

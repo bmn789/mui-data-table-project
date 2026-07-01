@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box, Typography, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip, Breadcrumbs, Link as MuiLink } from '@mui/material';
 import { Sun, Moon } from 'lucide-react';
 import { useThemeMode } from '../contexts/ThemeContext';
+import { NavLink, useLocation } from 'react-router';
 
 interface PageHeaderProps {
   /** Icon element rendered inside the coloured badge */
@@ -11,6 +12,51 @@ interface PageHeaderProps {
   /** Background colour of the icon badge */
   iconColor?: string;
 }
+
+export const PageBreadcrumbs: React.FC = () => {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  if (pathname === '/') {
+    return (
+      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2, '& .MuiBreadcrumbs-separator': { fontSize: '0.8rem' } }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.75rem' }}>
+          Home
+        </Typography>
+      </Breadcrumbs>
+    );
+  }
+
+  let pageLabel = '';
+  if (pathname === '/users') pageLabel = 'Users';
+  else if (pathname === '/transactions') pageLabel = 'Transactions';
+  else if (pathname === '/analytics') pageLabel = 'Analytics';
+  else if (pathname === '/settings') pageLabel = 'Settings';
+  else pageLabel = pathname.replace('/', '');
+
+  return (
+    <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2, '& .MuiBreadcrumbs-separator': { fontSize: '0.8rem', color: 'text.secondary' } }}>
+      <MuiLink
+        component={NavLink}
+        to="/"
+        underline="hover"
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          color: 'text.secondary',
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          '&:hover': { color: 'primary.main' }
+        }}
+      >
+        Home
+      </MuiLink>
+      <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.75rem' }}>
+        {pageLabel}
+      </Typography>
+    </Breadcrumbs>
+  );
+};
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
   icon,
@@ -22,8 +68,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <Box
       sx={{
+        display: { xs: 'none', md: 'flex' },
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
         width: '100%',
-        display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         px: 2.5,
@@ -64,6 +113,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
           onClick={toggleMode}
           size="small"
           sx={{
+            display: { xs: 'none', md: 'inline-flex' },
             color: 'text.secondary',
             bgcolor: 'action.hover',
             '&:hover': { bgcolor: 'action.selected' },

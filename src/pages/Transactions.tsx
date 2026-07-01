@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Container, Typography, CircularProgress, Alert, Chip } from '@mui/material';
 import { CreditCard } from 'lucide-react';
-import { PageHeader } from './PageHeader';
+import { PageHeader, PageBreadcrumbs } from './PageHeader';
 import type { Transaction } from '../types/transaction';
 import type { FilterFieldConfig, FilterRule } from '../types/filter';
 import { FilterBuilder } from '../components/FilterBuilder';
@@ -25,7 +25,12 @@ const transactionFilterConfigs: FilterFieldConfig[] = [
 ];
 
 const transactionColumns: ColumnDef<Record<string, unknown>>[] = [
-  { key: 'id', label: 'ID', minWidth: 70 },
+  {
+    key: 'id',
+    label: 'ID',
+    minWidth: 70,
+    render: (row) => `#${row.id}`,
+  },
   { key: 'description', label: 'Description', minWidth: 230 },
   {
     key: 'amount',
@@ -108,7 +113,8 @@ export const TransactionsPage: React.FC = () => {
         title="Transactions"
         iconColor="#f59e0b"
       />
-      <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+      <Container maxWidth={false} sx={{ pt: 2, pb: 6, px: { xs: 2, sm: 3, md: 4 } }}>
+        <PageBreadcrumbs />
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
