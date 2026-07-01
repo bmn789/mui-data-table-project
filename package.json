@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "description": "React Data Table — Reusable Filter & Data Table System",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
