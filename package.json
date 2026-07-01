@@ -1,7 +1,7 @@
 {
-  "name": "react-data-table",
+  "name": "mui-data-table-project",
   "private": true,
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
